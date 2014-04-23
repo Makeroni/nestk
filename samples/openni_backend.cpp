@@ -31,8 +31,14 @@ ntk::arg<int> kinect_id("--kinect-id", "Kinect id", 0);
 int colorTest = 0;
 
 int sliderPosition = 5; // Initial slider position
-int divisions = 16;	// Initial number of divisions
- 
+int divisionsX = 16;	// Initial number of divisions en el eje X
+int divisionsY = 8;     // Initial number of divisions en el eje Y
+
+float windowXStart = 50.0/100.0; // % de la imagen en el que se situa el centro eje X
+float windowXSize = 100.0/100.0; // % de la imagen que se emuestra en la salida de los leds en X
+float windowYStart = 50.0/100.0; // % de la imagen en el que se situa el centro eje Y
+float windowYSize = 100.0/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
+
 int blockXSize;         // Horizontal block size
 int blockYSize;         // Vertical block size
  
@@ -42,73 +48,73 @@ int width;              // The width  of the input stream
 int height;             // The height of the input stream
 
  
-// Callback function to adjust number of divisions when we move the slider
-void onDivisionSlide(int theSliderValue)
-{
-    // Put a lower limit of 1 on our slider position
-    if (sliderPosition < 0)
-    {
-        sliderPosition = 1;
-    }
+// // Callback function to adjust number of divisions when we move the slider
+// void onDivisionSlide(int theSliderValue)
+// {
+//     // Put a lower limit of 1 on our slider position
+//     if (sliderPosition < 0)
+//     {
+//         sliderPosition = 1;
+//     }
  
-    // Set the number of divisions depending on the slider location
-    // Factors of both 640 and 480: 1, 2, 4, 5, 8, 10, 16, 20, 32, 40, 160
-    switch (theSliderValue)
-    {
-    case 1:
-        divisions = 1;
-        break;
+//     // Set the number of divisions depending on the slider location
+//     // Factors of both 640 and 480: 1, 2, 4, 5, 8, 10, 16, 20, 32, 40, 160
+//     switch (theSliderValue)
+//     {
+//     case 1:
+//         divisionsX = 1;
+//         break;
  
-    case 2:
-        divisions = 2;
-        break;
+//     case 2:
+//         divisionsX = 2;
+//         break;
  
-    case 3:
-        divisions = 4;
-        break;
+//     case 3:
+//         divisionsX = 4;
+//         break;
  
-    case 4:
-        divisions = 5;
-        break;
+//     case 4:
+//         divisionsX = 5;
+//         break;
  
-    case 5:
-        divisions = 8;
-        break;
+//     case 5:
+//         divisionsX = 8;
+//         break;
  
-    case 6:
-        divisions = 10;
-        break;
+//     case 6:
+//         divisionsX = 10;
+//         break;
  
-    case 7:
-        divisions = 16;
-        break;
+//     case 7:
+//         divisionsX = 16;
+//         break;
  
-    case 8:
-        divisions = 20;
-        break;
+//     case 8:
+//         divisionsX = 20;
+//         break;
  
-    case 9:
-        divisions = 32;
-        break;
+//     case 9:
+//         divisionsX = 32;
+//         break;
  
-    case 10:
-        divisions = 40;
-        break;
+//     case 10:
+//         divisionsX = 40;
+//         break;
  
-    case 11:
-        divisions = 160;
-        break;
+//     case 11:
+//         divisionsX = 160;
+//         break;
  
-    default:
-        break;
-    }
+//     default:
+//         break;
+//     }
  
-    // Recalculate our block sizes and pixelCount for the new number of divisions
-    blockXSize = width  / divisions;
-    blockYSize = height / divisions;
+//     // Recalculate our block sizes and pixelCount for the new number of divisions
+//     blockXSize = width  / divisionsX;
+//     blockYSize = height / divisionsY;
  
-    pixelCount = blockXSize * blockYSize;
-}
+//     pixelCount = blockXSize * blockYSize;
+// }
 
 void
 set_blocking (int fd, int should_block)
@@ -241,7 +247,7 @@ int main(int argc, char **argv)
     int maxSliderValue = 11;
  
     // Create the divisions slider lider
-    cvCreateTrackbar("Divisions", "Low Rez Stream", &sliderPosition, maxSliderValue, onDivisionSlide);
+    //cvCreateTrackbar("Divisions", "Low Rez Stream", &sliderPosition, maxSliderValue, onDivisionSlide);
  
     // Get an initial frame so we know the size of things (cvQueryFrame is a combination of cvGrabFrame and cvRetrieveFrame)
     IplImage* pFrame = NULL;
@@ -293,11 +299,10 @@ int main(int argc, char **argv)
 	iimg1[197] = 'D';
 
     //dev es el valor que identifica a los dispositivos de leds /dev/ttyUSB[dev]
-    int dev[]={2,3};
+    int dev[]={3,2};
 
     int fd0 = start_led_dev(dev[0]);
     int fd1 = start_led_dev(dev[1]);
-
 
 	//Igualar los tonos de color
 	char str[10];
@@ -333,25 +338,27 @@ int main(int argc, char **argv)
         // Draw the original frame and low resolution version
         cvShowImage("WebCam", pFrame);
         cvShowImage("Low Rez Stream", pLowRezFrame);
- 
+
         // Calculate our blocksize per frame to cater for slider
-        blockXSize = width  / divisions / 2;
-        blockYSize = height / divisions / 2;
- 
+        blockXSize = width  * windowXSize / divisionsX; //width  / divisionsX / 2;
+        blockYSize = height * windowYSize / divisionsY; //height / divisionsY / 2;
+
         pixelCount = blockXSize * blockYSize; // How many pixels we'll read per block - used to find the average colour
- 
-        cout << "At " << divisions << " divisions (Block size " << blockXSize << "x" << blockYSize << ", so " << pixelCount << " pixels per block)" << endl;
- 
+
+        cout << "At " << divisionsX << " divisionsY " << divisionsY << " divisions (Block size " << blockXSize << "x" << blockYSize << ", so " << pixelCount << " pixels per block)" << endl;
+       // 16*8, 20*30, 600 pixeles por bloque
+       //cout << "width " << width << " height " << height << endl; 640*480
+
 		iiimg0 = 3;
 		iiimg1 = 3;
 
 		ij = 0;
         // Loop through each block vertically
-        for (int yLoop = height*1/8; yLoop < height*5/8; yLoop += blockYSize)
+        for (int yLoop = (height * windowYStart) - (height * windowYSize  / 2); yLoop < (height * windowYStart) + (height * windowYSize  / 2); yLoop += blockYSize)
         {
 			ii = 0;
 	        // Loop through each block horizontally
-	        for (int xLoop = width*2/8; xLoop < width*6/8; xLoop += blockXSize)
+	        for (int xLoop = (width * windowXStart) - (width * windowXSize  / 2); xLoop < (width * windowXStart) + (width * windowXSize  / 2); xLoop += blockXSize)
 	        {
  
                 // Reset our colour counters for each block
@@ -364,7 +371,8 @@ int main(int argc, char **argv)
                 {
  
                     for (int pixYLoop = 0; pixYLoop < blockYSize; pixYLoop++)
-                    {
+                    { 
+                        //sort(pFrame[0], pFrame[0] + blockXSize + blockYSize);
  
                         // Get the pixel colour from the webcam stream
                         ptr = cvPtr2D(pFrame, yLoop + pixYLoop, xLoop + pixXLoop, NULL);
