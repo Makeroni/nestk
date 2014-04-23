@@ -30,7 +30,6 @@ ntk::arg<int> kinect_id("--kinect-id", "Kinect id", 0);
 
 int colorTest = 0;
 
-int sliderPosition = 5; // Initial slider position
 int divisionsX = 16;	// Initial number of divisions en el eje X
 int divisionsY = 8;     // Initial number of divisions en el eje Y
 
@@ -46,75 +45,6 @@ int pixelCount;         // The number of pixels in a block (blockXSize multiplie
  
 int width;              // The width  of the input stream
 int height;             // The height of the input stream
-
- 
-// // Callback function to adjust number of divisions when we move the slider
-// void onDivisionSlide(int theSliderValue)
-// {
-//     // Put a lower limit of 1 on our slider position
-//     if (sliderPosition < 0)
-//     {
-//         sliderPosition = 1;
-//     }
- 
-//     // Set the number of divisions depending on the slider location
-//     // Factors of both 640 and 480: 1, 2, 4, 5, 8, 10, 16, 20, 32, 40, 160
-//     switch (theSliderValue)
-//     {
-//     case 1:
-//         divisionsX = 1;
-//         break;
- 
-//     case 2:
-//         divisionsX = 2;
-//         break;
- 
-//     case 3:
-//         divisionsX = 4;
-//         break;
- 
-//     case 4:
-//         divisionsX = 5;
-//         break;
- 
-//     case 5:
-//         divisionsX = 8;
-//         break;
- 
-//     case 6:
-//         divisionsX = 10;
-//         break;
- 
-//     case 7:
-//         divisionsX = 16;
-//         break;
- 
-//     case 8:
-//         divisionsX = 20;
-//         break;
- 
-//     case 9:
-//         divisionsX = 32;
-//         break;
- 
-//     case 10:
-//         divisionsX = 40;
-//         break;
- 
-//     case 11:
-//         divisionsX = 160;
-//         break;
- 
-//     default:
-//         break;
-//     }
- 
-//     // Recalculate our block sizes and pixelCount for the new number of divisions
-//     blockXSize = width  / divisionsX;
-//     blockYSize = height / divisionsY;
- 
-//     pixelCount = blockXSize * blockYSize;
-// }
 
 void
 set_blocking (int fd, int should_block)
@@ -229,8 +159,7 @@ int main(int argc, char **argv)
     RGBDImage image;
     // Image post processor. Compute mappings when RGB resolution is 1280x1024.
     OpenniRGBDProcessor post_processor;
-    namedWindow("depth");
-    namedWindow("color");
+
     //namedWindow("users");
     RGBDFrameRecorder record("base");
 
@@ -243,12 +172,7 @@ int main(int argc, char **argv)
     // Create two windows
     cvNamedWindow("WebCam", CV_WINDOW_AUTOSIZE);
     cvNamedWindow("Low Rez Stream", CV_WINDOW_AUTOSIZE);
- 
-    int maxSliderValue = 11;
- 
-    // Create the divisions slider lider
-    //cvCreateTrackbar("Divisions", "Low Rez Stream", &sliderPosition, maxSliderValue, onDivisionSlide);
- 
+
     // Get an initial frame so we know the size of things (cvQueryFrame is a combination of cvGrabFrame and cvRetrieveFrame)
     IplImage* pFrame = NULL;
 
@@ -345,7 +269,7 @@ int main(int argc, char **argv)
 
         pixelCount = blockXSize * blockYSize; // How many pixels we'll read per block - used to find the average colour
 
-        cout << "At " << divisionsX << " divisionsY " << divisionsY << " divisions (Block size " << blockXSize << "x" << blockYSize << ", so " << pixelCount << " pixels per block)" << endl;
+       //cout << "At " << divisionsX << " divisionsY " << divisionsY << " divisions (Block size " << blockXSize << "x" << blockYSize << ", so " << pixelCount << " pixels per block)" << endl;
        // 16*8, 20*30, 600 pixeles por bloque
        //cout << "width " << width << " height " << height << endl; 640*480
 
