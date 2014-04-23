@@ -33,6 +33,12 @@ endif("${CMAKE_BUILD_TYPE}" STREQUAL "")
 
 ################################################################################
 ### options
+SET(NESTK_USE_GSL 1)
+SET(NESTK_USE_FREENECT 1)
+SET(NESTK_USE_OPENNI 1)
+SET(NESTK_USE_OPENNI2 1)
+SET(NESTK_USE_NITE 1)
+SET(NESTK_USE_PCL 1)
 ################################################################################
 
 OPTION(NESTK_USE_GSL "Build GSL support." ${NESTK_USE_GSL})
