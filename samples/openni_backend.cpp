@@ -29,7 +29,7 @@ ntk::arg<int> kinect_id("--kinect-id", "Kinect id", 0);
 
 
 int colorTest = 0;     // 1 para hacer el test de como se ven los colores
-int useBlackWhite = 0; // 1 para ver como veríamos la profundidad usando solo un color
+int useBlackWhite = 1; // 1 para ver como veríamos la profundidad usando solo un color
 
 int divisionsX = 16;	// Initial number of divisions en el eje X
 int divisionsY = 8;     // Initial number of divisions en el eje Y
@@ -166,9 +166,10 @@ int main(int argc, char **argv)
 
     cv::Mat3b depth_as_color;
 
-    double zmin, zmax;
+    double zmin, zmax, zmed;
     zmin = 0.25;
-    zmax = 1.75; //5
+    zmed = 1.75;
+    zmax = 5.0; //5.0 1.75
 
     // Create two windows
     cvNamedWindow("WebCam", CV_WINDOW_AUTOSIZE);
@@ -182,7 +183,7 @@ int main(int argc, char **argv)
 	post_processor.processImage(image);
 
     int** blackWhite_im;     // Imagen en blanco y negro
-	blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax);
+	blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
 	pFrame = new IplImage(depth_as_color);
 
  
@@ -259,7 +260,7 @@ int main(int argc, char **argv)
         grabber.waitForNextFrame();
 		grabber.copyImageTo(image);
 		post_processor.processImage(image);
-		blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax);
+		blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
 		pFrame = new IplImage(depth_as_color);
 
         // Draw the original frame and low resolution version
@@ -300,6 +301,7 @@ int main(int argc, char **argv)
  
                     for (int pixYLoop = 0; pixYLoop < blockYSize; pixYLoop++)
                     { 
+                        //int a = 255*pow((1-zmin)/(zmax-zmin),log(1/2)/log(1-(zmed-zmin)/(zmax-zmin)));
                         imageSum[pixXLoop] [pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
  
                         // Get the pixel colour from the webcam stream

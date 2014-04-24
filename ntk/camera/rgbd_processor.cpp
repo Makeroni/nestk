@@ -1030,22 +1030,26 @@ namespace ntk
                                      double* i_min_val, double* i_max_val)
     {
 
+        double i_med_val = *i_max_val;
+
         compute_color_encoded_depth2(depth_im, color_depth_im,                                      
-                                     i_min_val, i_max_val);
+                                     i_min_val, i_max_val, &i_med_val);
     }
       
     int** compute_color_encoded_depth2(const cv::Mat1f& depth_im, cv::Mat3b& color_depth_im,                                      
-                                     double* i_min_val, double* i_max_val)
+                                     double* i_min_val, double* i_max_val, double* i_med_val)
     {
-        double min_val, max_val;
+        double min_val, max_val, med_val;
         if (i_min_val && i_max_val)
         {
             min_val = *i_min_val;
             max_val = *i_max_val;
+            med_val = *i_med_val;
         }
         else
         {
             minMaxLoc(depth_im, &min_val, &max_val);
+            med_val = max_val;
         }
 
         color_depth_im.create(depth_im.size());
@@ -1105,7 +1109,14 @@ namespace ntk
                     r = g = b = 0;
                 }
                 depth_color_data[c] = cv::Vec3b(b,g,r);
-                blackWhite[c] = v/6;
+
+                //Aplicamos función para que cuando mostramos solo un color
+                //se tenga más sensibilidad en la parte cercana
+                //float aux1 = (depth_data[c]-min_val)/(max_val-min_val);
+                //float aux2 = log(1/2)/log(1-(med_val-min_val)/(max_val-min_val));
+                //int n = 255*pow(aux1,aux2);
+                //blackWhite[c] = v/6;
+                blackWhite[c] = 255*pow(1.0-((depth_data[c]-min_val)/(max_val-min_val)),log(1.0/2.0)/log(1.0-(med_val-min_val)/(max_val-min_val)));
             }
         }
         return blackWhite_im;
