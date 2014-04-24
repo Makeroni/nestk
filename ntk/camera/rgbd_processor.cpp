@@ -18,6 +18,9 @@
  */
 
 
+//#include <iostream>
+//using namespace std;
+
 #include "rgbd_processor.h"
 #include <ntk/utils/opencv_utils.h>
 #include <ntk/utils/time.h>
@@ -1022,8 +1025,16 @@ namespace ntk
         }
 #endif
     }
-	  
-    void compute_color_encoded_depth(const cv::Mat1f& depth_im, cv::Mat3b& color_depth_im,
+	 
+    void compute_color_encoded_depth(const cv::Mat1f& depth_im, cv::Mat3b& color_depth_im,                                      
+                                     double* i_min_val, double* i_max_val)
+    {
+
+        compute_color_encoded_depth2(depth_im, color_depth_im,                                      
+                                     i_min_val, i_max_val);
+    }
+      
+    int** compute_color_encoded_depth2(const cv::Mat1f& depth_im, cv::Mat3b& color_depth_im,                                      
                                      double* i_min_val, double* i_max_val)
     {
         double min_val, max_val;
@@ -1038,16 +1049,20 @@ namespace ntk
         }
 
         color_depth_im.create(depth_im.size());
+        int** blackWhite_im = new int*[depth_im.rows];
         for (int r = 0; r < depth_im.rows; ++r)
         {
             const float* depth_data = depth_im.ptr<float>(r);
             cv::Vec3b* depth_color_data = color_depth_im.ptr<cv::Vec3b>(r);
+            blackWhite_im[r] = new int[depth_im.cols];
+            int* blackWhite = blackWhite_im[r];
             for (int c = 0; c < depth_im.cols; ++c)
             {
                 int v = 255*6*(depth_data[c]-min_val)/(max_val-min_val);
                 if (v < 0) v = 0;
                 unsigned char r,g,b;
                 int lb = v & 0xff;
+                //cout << "v " << v << " lb " << lb << " depth_data[c] " << depth_data[c] << endl;
                 switch (v / 256) {
                 case 0:
                     r = 255;
@@ -1090,8 +1105,10 @@ namespace ntk
                     r = g = b = 0;
                 }
                 depth_color_data[c] = cv::Vec3b(b,g,r);
+                blackWhite[c] = v/6;
             }
         }
+        return blackWhite_im;
     }
 
     OpenniRGBDProcessor::OpenniRGBDProcessor()

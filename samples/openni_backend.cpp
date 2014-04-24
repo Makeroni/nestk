@@ -28,7 +28,8 @@ ntk::arg<int> kinect_id("--kinect-id", "Kinect id", 0);
 }
 
 
-int colorTest = 0;
+int colorTest = 0;     // 1 para hacer el test de como se ven los colores
+int useBlackWhite = 0; // 1 para ver como veríamos la profundidad usando solo un color
 
 int divisionsX = 16;	// Initial number of divisions en el eje X
 int divisionsY = 8;     // Initial number of divisions en el eje Y
@@ -179,7 +180,9 @@ int main(int argc, char **argv)
 	grabber.waitForNextFrame();
 	grabber.copyImageTo(image);
 	post_processor.processImage(image);
-	compute_color_encoded_depth(image.depth(), depth_as_color, &zmin, &zmax);
+
+    int** blackWhite_im;     // Imagen en blanco y negro
+	blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax);
 	pFrame = new IplImage(depth_as_color);
 
  
@@ -188,7 +191,7 @@ int main(int argc, char **argv)
  
     uchar *ptr; // Pointer to our pixel
  
-    int red, green, blue; // Integers to hold our pixel values
+    int red, green, blue, blackWhite; // Integers to hold our pixel values
  
     // Get the width and height of our webcam input stream
     int width  = pFrame->width ;
@@ -223,7 +226,7 @@ int main(int argc, char **argv)
 	iimg1[197] = 'D';
 
     //dev es el valor que identifica a los dispositivos de leds /dev/ttyUSB[dev]
-    int dev[]={3,2};
+    int dev[]={1,0};
 
     int fd0 = start_led_dev(dev[0]);
     int fd1 = start_led_dev(dev[1]);
@@ -256,7 +259,7 @@ int main(int argc, char **argv)
         grabber.waitForNextFrame();
 		grabber.copyImageTo(image);
 		post_processor.processImage(image);
-		compute_color_encoded_depth(image.depth(), depth_as_color, &zmin, &zmax);
+		blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax);
 		pFrame = new IplImage(depth_as_color);
 
         // Draw the original frame and low resolution version
@@ -289,14 +292,15 @@ int main(int argc, char **argv)
                 int redSum[blockXSize] [blockYSize];
                 int greenSum[blockXSize] [blockYSize];
                 int blueSum[blockXSize] [blockYSize];
- 
+                int imageSum[blockXSize] [blockYSize];
+
                 // Read every pixel in the block and calculate the average colour
                 for (int pixXLoop = 0; pixXLoop < blockXSize; pixXLoop++)
                 {
  
                     for (int pixYLoop = 0; pixYLoop < blockYSize; pixYLoop++)
                     { 
-                        //sort(pFrame[0], pFrame[0] + blockXSize + blockYSize);
+                        imageSum[pixXLoop] [pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
  
                         // Get the pixel colour from the webcam stream
                         ptr = cvPtr2D(pFrame, yLoop + pixYLoop, xLoop + pixXLoop, NULL);
@@ -310,6 +314,7 @@ int main(int argc, char **argv)
  
                 } // End of outer x pixel countier loop
 
+                sort(imageSum[0], imageSum[0] + blockXSize + blockYSize);
 				sort(redSum[0], redSum[0] + blockXSize + blockYSize);
 				sort(greenSum[0], greenSum[0] + blockXSize + blockYSize);
 				sort(blueSum[0], blueSum[0] + blockXSize + blockYSize);
@@ -318,7 +323,15 @@ int main(int argc, char **argv)
                 red   = redSum[blockXSize/10][blockYSize/10];
                 green = greenSum[blockXSize/10][blockYSize/10];
                 blue  = blueSum[blockXSize/10][blockYSize/10];
- 
+                blackWhite = imageSum[blockXSize/10][blockYSize/10];
+
+                //Si queremos probar como se vería todo en un solo color
+                if(useBlackWhite){
+                    red   = blackWhite;
+                    green = 0;
+                    blue  = 0;
+                }
+
 				unsigned char redcolor = c;
 				unsigned char greencolor = c;
 				unsigned char bluecolor = c;
