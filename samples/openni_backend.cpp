@@ -22,6 +22,11 @@
 
 #include <typeinfo> 
 
+//Para el uso del ratón en las pruebas
+#include <stdlib.h>
+#include <linux/input.h>
+#define MOUSEFILE "/dev/input/mouse0"
+
 using namespace cv;
 using namespace ntk;
 namespace opt
@@ -30,17 +35,19 @@ ntk::arg<bool> high_resolution("--highres", "High resolution color image.", 0);
 ntk::arg<int> kinect_id("--kinect-id", "Kinect id", 0);
 }
 
-
+//OPCIONES
 int colorTest = 0;     // 1 para hacer el test de como se ven los colores
 int useBlackWhite = 1; // 1 para ver como veríamos la profundidad usando solo un color
 
+//TAMAÑO LEDS
 int divisionsX = 16;	// Initial number of divisions en el eje X
 int divisionsY = 8;     // Initial number of divisions en el eje Y
 
-float windowXStart = 50.0/100.0; // % de la imagen en el que se situa el centro eje X
-float windowXSize = 50.0/100.0; // % de la imagen que se emuestra en la salida de los leds en X
-float windowYStart = 50.0/100.0; // % de la imagen en el que se situa el centro eje Y
-float windowYSize = 50.0/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
+//TAMAÑO VENTANA (%)
+float windowXStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje X
+float totalWindowXSize = 40.0/100.0; // % de la imagen que se emuestra en la salida de los leds en X
+float windowYStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje Y
+float totalWindowYSize = 40.0/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
 
 int blockXSize;         // Horizontal block size
 int blockYSize;         // Vertical block size
@@ -49,6 +56,9 @@ int pixelCount;         // The number of pixels in a block (blockXSize multiplie
  
 int width;              // The width  of the input stream
 int height;             // The height of the input stream
+
+//Si es mayor que 0, indica que hemso parpadeado
+int eye = 0;
 
 void
 set_blocking (int fd, int should_block)
@@ -130,13 +140,21 @@ start_led_dev (int dev)
     return fd0;
 }
 
+void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+{
+	if  ( event == EVENT_LBUTTONDOWN )
+	{
+		eye = 30;
+		//std::cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << std::endl;
+	}
+}
+
 /**
 Función principal
 Lee la información 3D y la muestra en pantalla y en los dispositivos led conectados
 **/
 int main(int argc, char **argv)
 {
-
 	//color blanco
 	unsigned char c = (unsigned char) (254);
 
@@ -172,11 +190,13 @@ int main(int argc, char **argv)
     double zmin, zmax, zmed;
     zmin = 0.25;
     zmed = 1.75;
-    zmax = 5.0; //5.0 1.75
+    zmax = 5.0;
 
     // Create two windows
     cvNamedWindow("WebCam", CV_WINDOW_AUTOSIZE);
     cvNamedWindow("Low Rez Stream", CV_WINDOW_AUTOSIZE);
+
+	cvSetMouseCallback("Low Rez Stream", CallBackFunc, NULL);
 
     // Get an initial frame so we know the size of things (cvQueryFrame is a combination of cvGrabFrame and cvRetrieveFrame)
     IplImage* pFrame = NULL;
@@ -257,8 +277,18 @@ int main(int argc, char **argv)
 
 	keypress = cvWaitKey(1000);
 
+	float windowXSize = totalWindowXSize;
+	float windowYSize = totalWindowYSize;
     while (quit == false)
-    {
+    {		
+		//Hemos abierto los ojos hace menos de eye frames
+		if(eye>0){
+			std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
+			windowXSize=totalWindowXSize-eye/100.0;
+			windowYSize=totalWindowYSize-eye/100.0;
+			eye=eye-1;
+		}
+
         // Grab a frame from the webcam 
         grabber.waitForNextFrame();
 		grabber.copyImageTo(image);
@@ -271,14 +301,13 @@ int main(int argc, char **argv)
         cvShowImage("Low Rez Stream", pLowRezFrame);
 
         // Calculate our blocksize per frame to cater for slider
-        blockXSize = width  * windowXSize / divisionsX; //width  / divisionsX / 2;
-        blockYSize = height * windowYSize / divisionsY; //height / divisionsY / 2;
+        blockXSize = width  * windowXSize / divisionsX;
+        blockYSize = height * windowYSize / divisionsY;
+		if(blockXSize<1){ blockXSize=1; }
+		if(blockYSize<1){ blockYSize=1;	}
+std::cout << "blockXSize " << blockXSize << "width" << width << "divisionsX" << divisionsX << std::endl;
 
         pixelCount = blockXSize * blockYSize; // How many pixels we'll read per block - used to find the average colour
-
-       //std::cout << "At " << divisionsX << " divisionsY " << divisionsY << " divisions (Block size " << blockXSize << "x" << blockYSize << ", so " << pixelCount << " pixels per block)" << std::endl;
-       // 16*8, 20*30, 600 pixeles por bloque
-       //std::cout << "width " << width << " height " << height << std::endl; 640*480
 
 		iiimg0 = 3;
 		iiimg1 = 3;
@@ -298,37 +327,43 @@ int main(int argc, char **argv)
                 uchar blueSum[blockXSize*blockYSize];
                 int imageSum[blockXSize*blockYSize];
 
+//				for (int i = 0; i < blockXSize*blockYSize; ++i) 
+//				 		imageSum[i]=12;
+
                 // Read every pixel in the block and calculate the average colour
                 for (int pixXLoop = 0; pixXLoop < blockXSize; pixXLoop++)
                 {
  
                     for (int pixYLoop = 0; pixYLoop < blockYSize; pixYLoop++)
-                    { 
-                        //int a = 255*pow((1-zmin)/(zmax-zmin),log(1/2)/log(1-(zmed-zmin)/(zmax-zmin)));
-                        imageSum[pixXLoop*blockXSize+pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
+                    {
+                        imageSum[pixXLoop*blockYSize+pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
  
                         // Get the pixel colour from the webcam stream
                         ptr = cvPtr2D(pFrame, yLoop + pixYLoop, xLoop + pixXLoop, NULL);
  
                         // Add each component to its sum
-                        redSum[pixXLoop*blockXSize+pixYLoop] = ptr[2];
-                        greenSum[pixXLoop*blockXSize+pixYLoop] = ptr[1];
-                        blueSum[pixXLoop*blockXSize+pixYLoop] = ptr[0];
+                        redSum[pixXLoop*blockYSize+pixYLoop] = ptr[2];
+                        greenSum[pixXLoop*blockYSize+pixYLoop] = ptr[1];
+                        blueSum[pixXLoop*blockYSize+pixYLoop] = ptr[0];
  
                     } // End of inner y pixel counting loop
  
                 } // End of outer x pixel countier loop
 
-	//for (int i = 0; i < blockXSize*blockYSize; ++i) 
- 	//	std::cout << imageSum[i] << '_';
+//				if(yLoop==96 && xLoop==128){
+//					for (int i = 0; i < blockXSize*blockYSize; ++i) 
+//				 		std::cout << i << " _ " << imageSum[i] << " -> ";
+//				}
 
                 std::sort(imageSum, imageSum + blockXSize * blockYSize);
 				std::sort(redSum, redSum + blockXSize * blockYSize);
 				std::sort(greenSum, greenSum + blockXSize * blockYSize);
 				std::sort(blueSum, blueSum + blockXSize * blockYSize);
 
-	//for (int i = 0; i < blockXSize*blockYSize; ++i) 
- 	//	std::cout << imageSum[i] << '-';
+//				if(yLoop==96 && xLoop==128){
+//					for (int i = 0; i < blockXSize*blockYSize; ++i) 
+//				 		std::cout << i << " / " << imageSum[i] << " -> ";
+//				}
 
 				int div=9;
                 // Calculate the average colour of the block
@@ -336,13 +371,20 @@ int main(int argc, char **argv)
                 green = greenSum[blockXSize*blockYSize/div];
                 blue  = blueSum[blockXSize*blockYSize/div];
                 blackWhite = imageSum[blockXSize*blockYSize/div];
-				if(blackWhite>255 && div>0){
+
+//				std::cout << "yLoop " << yLoop << " xLoop " << xLoop << " blackWhite " << blackWhite << " ini " << imageSum[0] << " fin " << imageSum[blockXSize*blockYSize-1] << std::endl;
+
+				if(blackWhite>255 && div>0){ // && blackWhite<=0
 					div=div-1;
 	                blackWhite = imageSum[blockXSize*blockYSize/div];
 				}
 				
 
-				std::cout << "blackWhite " << blackWhite << " ini " << imageSum[0] << " fin " << imageSum[blockXSize*blockYSize-1] << std::endl;
+				//std::cout << "blackWhite " << blackWhite << " ini " << imageSum[0] << " fin " << imageSum[blockXSize*blockYSize-1] << std::endl;
+
+//				if(eye>0){
+//					blackWhite=0;
+//				}
 
                 //Si queremos probar como se vería todo en un solo color
                 if(useBlackWhite){
