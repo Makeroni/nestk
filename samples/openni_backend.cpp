@@ -13,11 +13,14 @@
 
 #include "opencv/cv.h"
 #include "opencv/highgui.h"
-using namespace std;
+//using namespace std;
 #include <fcntl.h>
+
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
+
+#include <typeinfo> 
 
 using namespace cv;
 using namespace ntk;
@@ -35,9 +38,9 @@ int divisionsX = 16;	// Initial number of divisions en el eje X
 int divisionsY = 8;     // Initial number of divisions en el eje Y
 
 float windowXStart = 50.0/100.0; // % de la imagen en el que se situa el centro eje X
-float windowXSize = 100.0/100.0; // % de la imagen que se emuestra en la salida de los leds en X
+float windowXSize = 50.0/100.0; // % de la imagen que se emuestra en la salida de los leds en X
 float windowYStart = 50.0/100.0; // % de la imagen en el que se situa el centro eje Y
-float windowYSize = 100.0/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
+float windowYSize = 50.0/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
 
 int blockXSize;         // Horizontal block size
 int blockYSize;         // Vertical block size
@@ -227,7 +230,7 @@ int main(int argc, char **argv)
 	iimg1[197] = 'D';
 
     //dev es el valor que identifica a los dispositivos de leds /dev/ttyUSB[dev]
-    int dev[]={1,0};
+    int dev[]={0,1};
 
     int fd0 = start_led_dev(dev[0]);
     int fd1 = start_led_dev(dev[1]);
@@ -273,9 +276,9 @@ int main(int argc, char **argv)
 
         pixelCount = blockXSize * blockYSize; // How many pixels we'll read per block - used to find the average colour
 
-       //cout << "At " << divisionsX << " divisionsY " << divisionsY << " divisions (Block size " << blockXSize << "x" << blockYSize << ", so " << pixelCount << " pixels per block)" << endl;
+       //std::cout << "At " << divisionsX << " divisionsY " << divisionsY << " divisions (Block size " << blockXSize << "x" << blockYSize << ", so " << pixelCount << " pixels per block)" << std::endl;
        // 16*8, 20*30, 600 pixeles por bloque
-       //cout << "width " << width << " height " << height << endl; 640*480
+       //std::cout << "width " << width << " height " << height << std::endl; 640*480
 
 		iiimg0 = 3;
 		iiimg1 = 3;
@@ -290,10 +293,10 @@ int main(int argc, char **argv)
 	        {
  
                 // Reset our colour counters for each block
-                int redSum[blockXSize] [blockYSize];
-                int greenSum[blockXSize] [blockYSize];
-                int blueSum[blockXSize] [blockYSize];
-                int imageSum[blockXSize] [blockYSize];
+                uchar redSum[blockXSize*blockYSize];
+                uchar greenSum[blockXSize*blockYSize];
+                uchar blueSum[blockXSize*blockYSize];
+                int imageSum[blockXSize*blockYSize];
 
                 // Read every pixel in the block and calculate the average colour
                 for (int pixXLoop = 0; pixXLoop < blockXSize; pixXLoop++)
@@ -302,30 +305,44 @@ int main(int argc, char **argv)
                     for (int pixYLoop = 0; pixYLoop < blockYSize; pixYLoop++)
                     { 
                         //int a = 255*pow((1-zmin)/(zmax-zmin),log(1/2)/log(1-(zmed-zmin)/(zmax-zmin)));
-                        imageSum[pixXLoop] [pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
+                        imageSum[pixXLoop*blockXSize+pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
  
                         // Get the pixel colour from the webcam stream
                         ptr = cvPtr2D(pFrame, yLoop + pixYLoop, xLoop + pixXLoop, NULL);
  
                         // Add each component to its sum
-                        redSum[pixXLoop] [pixYLoop] = ptr[2];
-                        greenSum[pixXLoop] [pixYLoop] = ptr[1];
-                        blueSum[pixXLoop] [pixYLoop] = ptr[0];
+                        redSum[pixXLoop*blockXSize+pixYLoop] = ptr[2];
+                        greenSum[pixXLoop*blockXSize+pixYLoop] = ptr[1];
+                        blueSum[pixXLoop*blockXSize+pixYLoop] = ptr[0];
  
                     } // End of inner y pixel counting loop
  
                 } // End of outer x pixel countier loop
 
-                sort(imageSum[0], imageSum[0] + blockXSize + blockYSize);
-				sort(redSum[0], redSum[0] + blockXSize + blockYSize);
-				sort(greenSum[0], greenSum[0] + blockXSize + blockYSize);
-				sort(blueSum[0], blueSum[0] + blockXSize + blockYSize);
+	//for (int i = 0; i < blockXSize*blockYSize; ++i) 
+ 	//	std::cout << imageSum[i] << '_';
 
+                std::sort(imageSum, imageSum + blockXSize * blockYSize);
+				std::sort(redSum, redSum + blockXSize * blockYSize);
+				std::sort(greenSum, greenSum + blockXSize * blockYSize);
+				std::sort(blueSum, blueSum + blockXSize * blockYSize);
+
+	//for (int i = 0; i < blockXSize*blockYSize; ++i) 
+ 	//	std::cout << imageSum[i] << '-';
+
+				int div=9;
                 // Calculate the average colour of the block
-                red   = redSum[blockXSize/10][blockYSize/10];
-                green = greenSum[blockXSize/10][blockYSize/10];
-                blue  = blueSum[blockXSize/10][blockYSize/10];
-                blackWhite = imageSum[blockXSize/10][blockYSize/10];
+                red   = redSum[blockXSize*blockYSize/div];
+                green = greenSum[blockXSize*blockYSize/div];
+                blue  = blueSum[blockXSize*blockYSize/div];
+                blackWhite = imageSum[blockXSize*blockYSize/div];
+				if(blackWhite>255 && div>0){
+					div=div-1;
+	                blackWhite = imageSum[blockXSize*blockYSize/div];
+				}
+				
+
+				std::cout << "blackWhite " << blackWhite << " ini " << imageSum[0] << " fin " << imageSum[blockXSize*blockYSize-1] << std::endl;
 
                 //Si queremos probar como se vería todo en un solo color
                 if(useBlackWhite){
