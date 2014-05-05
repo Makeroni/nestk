@@ -281,14 +281,6 @@ int main(int argc, char **argv)
 	float windowYSize = totalWindowYSize;
     while (quit == false)
     {		
-		//Hemos abierto los ojos hace menos de eye frames
-		if(eye>0){
-			std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
-			windowXSize=totalWindowXSize-eye/100.0;
-			windowYSize=totalWindowYSize-eye/100.0;
-			eye=eye-1;
-		}
-
         // Grab a frame from the webcam 
         grabber.waitForNextFrame();
 		grabber.copyImageTo(image);
@@ -299,6 +291,24 @@ int main(int argc, char **argv)
         // Draw the original frame and low resolution version
         cvShowImage("WebCam", pFrame);
         cvShowImage("Low Rez Stream", pLowRezFrame);
+
+		//Hemos abierto los ojos hace menos de eye frames
+		if(eye>0){
+			std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
+			windowXSize=totalWindowXSize-eye/100.0;
+			windowYSize=totalWindowYSize-eye/100.0;
+			eye=eye-1;
+
+            cvRectangle(
+                pLowRezFrame,
+                cvPoint(0,0),
+                cvPoint(pFrame->width, pFrame->height),
+                CV_RGB(0, 0, 0),
+                CV_FILLED,
+                8,
+                0
+            );
+		}
 
         // Calculate our blocksize per frame to cater for slider
         blockXSize = width  * windowXSize / divisionsX;
