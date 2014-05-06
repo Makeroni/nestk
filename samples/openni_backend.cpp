@@ -232,7 +232,6 @@ int main(int argc, char **argv)
 
 	FILE *fp;
 	unsigned char iimg0[198],iimg1[198];
-	int iiimg0, iiimg1;
 	int ii, ij;
 
 	iimg0[  0] = 'S';
@@ -250,7 +249,7 @@ int main(int argc, char **argv)
 	iimg1[197] = 'D';
 
     //dev es el valor que identifica a los dispositivos de leds /dev/ttyUSB[dev]
-    int dev[]={0,1};
+    int dev[]={1,0};
 
     int fd0 = start_led_dev(dev[0]);
     int fd1 = start_led_dev(dev[1]);
@@ -294,7 +293,7 @@ int main(int argc, char **argv)
 
 		//Hemos abierto los ojos hace menos de eye frames
 		if(eye>0){
-			std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
+			//std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
 			windowXSize=totalWindowXSize-eye/100.0;
 			windowYSize=totalWindowYSize-eye/100.0;
 			eye=eye-1;
@@ -311,16 +310,15 @@ int main(int argc, char **argv)
 		}
 
         // Calculate our blocksize per frame to cater for slider
-        blockXSize = width  * windowXSize / divisionsX;
-        blockYSize = height * windowYSize / divisionsY;
+        blockXSize = ceil(width  * windowXSize / divisionsX);
+        blockYSize = ceil(height * windowYSize / divisionsY);
 		if(blockXSize<1){ blockXSize=1; }
 		if(blockYSize<1){ blockYSize=1;	}
-std::cout << "blockXSize " << blockXSize << "width" << width << "divisionsX" << divisionsX << std::endl;
+//std::cout << "blockXSize " << blockXSize << " xLoop " << (width * windowXStart) - (width * windowXSize  / 2) << " " << (width * windowXStart) + (width * windowXSize  / 2) << std::endl;
+
+//std::cout << "blockYSize " << blockYSize << " yLoop " << (height * windowYStart) - (height * windowYSize  / 2) << " " << (height * windowYStart) + (height * windowYSize  / 2) << std::endl;
 
         pixelCount = blockXSize * blockYSize; // How many pixels we'll read per block - used to find the average colour
-
-		iiimg0 = 3;
-		iiimg1 = 3;
 
 		ij = 0;
         // Loop through each block vertically
@@ -392,16 +390,14 @@ std::cout << "blockXSize " << blockXSize << "width" << width << "divisionsX" << 
 
 				//std::cout << "blackWhite " << blackWhite << " ini " << imageSum[0] << " fin " << imageSum[blockXSize*blockYSize-1] << std::endl;
 
-//				if(eye>0){
-//					blackWhite=0;
-//				}
-
                 //Si queremos probar como se vería todo en un solo color
                 if(useBlackWhite){
                     red   = blackWhite;
                     green = 0;
                     blue  = 0;
                 }
+
+//std::cout << "ii " << ii << " ij " << ij << "blockYSize " << blockYSize << " blockXSize " << blockXSize << std::endl;
 
 				unsigned char redcolor = c;
 				unsigned char greencolor = c;
@@ -442,6 +438,10 @@ std::cout << "blockXSize " << blockXSize << "width" << width << "divisionsX" << 
  			ij++;
         } // End of outer x loop
 
+//		for (int i = 0; i < 198; ++i) 
+//				 		std::cout << i << " _ " << (int) iimg0[i] << " -> ";
+//		for (int i = 0; i < 198; ++i) 
+//				 		std::cout << i << " / " << (int) iimg1[i] << " -> ";
 		write (fd0, iimg1, 198);
 		write (fd1, iimg0, 198);
  
