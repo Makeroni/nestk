@@ -13,26 +13,20 @@
 
 #include "opencv/cv.h"
 #include "opencv/highgui.h"
-//using namespace std;
 #include <fcntl.h>
 
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
 
-#include <typeinfo> 
-
-//Para el uso del ratón en las pruebas
-#include <stdlib.h>
-#include <linux/input.h>
-#define MOUSEFILE "/dev/input/mouse0"
+#include <typeinfo>
 
 using namespace cv;
 using namespace ntk;
 namespace opt
 {
-ntk::arg<bool> high_resolution("--highres", "High resolution color image.", 0);
-ntk::arg<int> kinect_id("--kinect-id", "Kinect id", 0);
+	ntk::arg<bool> high_resolution("--highres", "High resolution color image.", 0);
+	ntk::arg<int> kinect_id("--kinect-id", "Kinect id", 0);
 }
 
 //OPCIONES
@@ -51,9 +45,7 @@ float totalWindowYSize = 40.0/100.0; // % de la imagen que se emuestra en la sal
 
 int blockXSize;         // Horizontal block size
 int blockYSize;         // Vertical block size
- 
-int pixelCount;         // The number of pixels in a block (blockXSize multiplied by blockYSize)
- 
+
 int width;              // The width  of the input stream
 int height;             // The height of the input stream
 
@@ -62,8 +54,7 @@ int eye = 0;
 //Si es mayor que 0, indica que hemos movido los ojos
 bool move = false;
 
-void
-set_blocking (int fd, int should_block)
+void set_blocking (int fd, int should_block)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
@@ -80,8 +71,7 @@ set_blocking (int fd, int should_block)
                 printf ("error %d setting term attributes", errno);
 }
 
-int
-set_interface_attribs (int fd, int speed, int parity)
+int set_interface_attribs (int fd, int speed, int parity)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
@@ -122,17 +112,16 @@ set_interface_attribs (int fd, int speed, int parity)
 }
 
 /**
-Recibe el entero queidentifica al dispositivo en /dev/ttyUSB*
-Lo incializa y devuelve su identificador
+	Recibe el entero queidentifica al dispositivo en /dev/ttyUSB*
+	Lo incializa y devuelve su identificador
 **/
-int
-start_led_dev (int dev)
+int start_led_dev (int dev)
 {
     char buffer[200];
     int n;
 
     n=sprintf (buffer, "stty -F /dev/ttyUSB%d cs8 115200 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke noflsh -ixon -crtscts", dev);
-    system(buffer); 
+    int returnValue = system(buffer); 
 
     n=sprintf (buffer, "/dev/ttyUSB%d", dev);
     int fd0 = open (buffer, O_RDWR | O_NOCTTY | O_SYNC);
@@ -142,6 +131,9 @@ start_led_dev (int dev)
     return fd0;
 }
 
+/**
+	Recibe los eventos del ratón, para emular el eye tracking
+**/
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 {
 	if  ( event == EVENT_LBUTTONDOWN )
@@ -157,8 +149,8 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 }
 
 /**
-Función principal
-Lee la información 3D y la muestra en pantalla y en los dispositivos led conectados
+	Función principal
+	Lee la información 3D y la muestra en pantalla y en los dispositivos led conectados
 **/
 int main(int argc, char **argv)
 {
@@ -168,9 +160,11 @@ int main(int argc, char **argv)
     // Parse command line options.
     arg_base::set_help_option("-h");
     arg_parse(argc, argv);
-    // Set debug level to 1.
-    ntk::ntk_debug_level = 1;
-    // Set current directory to application directory.
+
+//    // Set debug level to 1.
+//    ntk::ntk_debug_level = 100;
+    
+	// Set current directory to application directory.
     // This is to find Nite config in config/ directory.
     QApplication app (argc, argv);
     QDir::setCurrent(QApplication::applicationDirPath());
@@ -241,6 +235,7 @@ int main(int argc, char **argv)
 	unsigned char iimg0[198],iimg1[198];
 	int ii, ij;
 
+	//Escribímos "STA" al principi del vector "END" al final
 	iimg0[  0] = 'S';
 	iimg0[  1] = 'T';
 	iimg0[  2] = 'A';
@@ -279,7 +274,7 @@ int main(int argc, char **argv)
 	strcat (str, b);
 	strcat (str, "COL");
 
-	write(fd0, str, 198);
+	ssize_t returnValue = write(fd0, str, 198);
 
 	keypress = cvWaitKey(1000);
 
@@ -300,7 +295,6 @@ int main(int argc, char **argv)
         cvShowImage("WebCam", pFrame);
         cvShowImage("Low Rez Stream", pLowRezFrame);
 
-
 		//Borramos todos los píxeles, por si el nuevo cuadro no coincide
 		if(eye!=0 || move){
             cvRectangle(
@@ -314,6 +308,7 @@ int main(int argc, char **argv)
             );			
 		}
 
+		//Si hemos detectado movimiento actualizamos la posición del centro del cuadro
 		if(move){
 			windowXStart=totalWindowXStart;
 			windowYStart=totalWindowYStart;
@@ -350,8 +345,6 @@ int main(int argc, char **argv)
 		if((height * windowYStart) + (height * windowYSize  / 2)>height){
 			windowYStart = 1 - windowYSize  / 2; 
 		}
-
-        pixelCount = blockXSize * blockYSize; // How many pixels we'll read per block - used to find the average colour
 
 		ij = 0;
         // Loop through each block vertically
@@ -456,8 +449,8 @@ int main(int argc, char **argv)
  			ij++;
         } // End of outer x loop
 
-		write (fd0, iimg1, 198);
-		write (fd1, iimg0, 198);
+	 	returnValue = write (fd0, iimg1, 198);
+ 		returnValue = write (fd1, iimg0, 198);
  
         // Wait 5 millisecond
         keypress = cvWaitKey(1);
