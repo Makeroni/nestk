@@ -44,9 +44,9 @@ int divisionsX = 16;	// Initial number of divisions en el eje X
 int divisionsY = 8;     // Initial number of divisions en el eje Y
 
 //TAMAÑO VENTANA (%)
-float windowXStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje X
+float totalWindowXStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje X
 float totalWindowXSize = 40.0/100.0; // % de la imagen que se emuestra en la salida de los leds en X
-float windowYStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje Y
+float totalWindowYStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje Y
 float totalWindowYSize = 40.0/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
 
 int blockXSize;         // Horizontal block size
@@ -57,8 +57,10 @@ int pixelCount;         // The number of pixels in a block (blockXSize multiplie
 int width;              // The width  of the input stream
 int height;             // The height of the input stream
 
-//Si es mayor que 0, indica que hemso parpadeado
+//Si es mayor que 0, indica que hemos parpadeado
 int eye = 0;
+//Si es mayor que 0, indica que hemos movido los ojos
+bool move = false;
 
 void
 set_blocking (int fd, int should_block)
@@ -67,7 +69,7 @@ set_blocking (int fd, int should_block)
         memset (&tty, 0, sizeof tty);
         if (tcgetattr (fd, &tty) != 0)
         {
-                //error_message ("error %d from tggetattr", errno);
+                printf ("error %d from tggetattr", errno);
                 return;
         }
 
@@ -75,7 +77,7 @@ set_blocking (int fd, int should_block)
         tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
 
         if (tcsetattr (fd, TCSANOW, &tty) != 0){}
-                //error_message ("error %d setting term attributes", errno);
+                printf ("error %d setting term attributes", errno);
 }
 
 int
@@ -85,7 +87,7 @@ set_interface_attribs (int fd, int speed, int parity)
         memset (&tty, 0, sizeof tty);
         if (tcgetattr (fd, &tty) != 0)
         {
-                //error_message ("error %d from tcgetattr", errno);
+                printf ("error %d from tcgetattr", errno);
                 return -1;
         }
 
@@ -144,9 +146,14 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 {
 	if  ( event == EVENT_LBUTTONDOWN )
 	{
-		eye = 30;
-		//std::cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << std::endl;
+		eye = -30;
 	}
+	else if ( event == EVENT_MOUSEMOVE )
+     {
+			totalWindowXStart = (float)x / (float)width;
+			totalWindowYStart = (float)y / (float)height;
+			move=true;
+     }
 }
 
 /**
@@ -196,7 +203,7 @@ int main(int argc, char **argv)
     cvNamedWindow("WebCam", CV_WINDOW_AUTOSIZE);
     cvNamedWindow("Low Rez Stream", CV_WINDOW_AUTOSIZE);
 
-	cvSetMouseCallback("Low Rez Stream", CallBackFunc, NULL);
+	cvSetMouseCallback("WebCam", CallBackFunc, NULL);
 
     // Get an initial frame so we know the size of things (cvQueryFrame is a combination of cvGrabFrame and cvRetrieveFrame)
     IplImage* pFrame = NULL;
@@ -211,15 +218,15 @@ int main(int argc, char **argv)
 
  
     // Create an image the same size and colour-depth as our input stream
-    IplImage* pLowRezFrame = cvCreateImage(cvSize(pFrame->width, pFrame->height), IPL_DEPTH_8U, 3);
+   	IplImage* pLowRezFrame = cvCreateImage(cvSize(pFrame->width, pFrame->height), IPL_DEPTH_8U, 3);
  
     uchar *ptr; // Pointer to our pixel
  
     int red, green, blue, blackWhite; // Integers to hold our pixel values
  
     // Get the width and height of our webcam input stream
-    int width  = pFrame->width ;
-    int height = pFrame->height;
+    width  = pFrame->width ;
+    height = pFrame->height;
  
     // Integers to hold our total colour values (used to find the average)
     int redSum     = 0;
@@ -249,7 +256,7 @@ int main(int argc, char **argv)
 	iimg1[197] = 'D';
 
     //dev es el valor que identifica a los dispositivos de leds /dev/ttyUSB[dev]
-    int dev[]={1,0};
+    int dev[]={0,1};
 
     int fd0 = start_led_dev(dev[0]);
     int fd1 = start_led_dev(dev[1]);
@@ -278,6 +285,8 @@ int main(int argc, char **argv)
 
 	float windowXSize = totalWindowXSize;
 	float windowYSize = totalWindowYSize;
+	float windowXStart = totalWindowXStart;
+	float windowYStart = totalWindowYStart;
     while (quit == false)
     {		
         // Grab a frame from the webcam 
@@ -291,13 +300,9 @@ int main(int argc, char **argv)
         cvShowImage("WebCam", pFrame);
         cvShowImage("Low Rez Stream", pLowRezFrame);
 
-		//Hemos abierto los ojos hace menos de eye frames
-		if(eye>0){
-			//std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
-			windowXSize=totalWindowXSize-eye/100.0;
-			windowYSize=totalWindowYSize-eye/100.0;
-			eye=eye-1;
 
+		//Borramos todos los píxeles, por si el nuevo cuadro no coincide
+		if(eye!=0 || move){
             cvRectangle(
                 pLowRezFrame,
                 cvPoint(0,0),
@@ -306,7 +311,25 @@ int main(int argc, char **argv)
                 CV_FILLED,
                 8,
                 0
-            );
+            );			
+		}
+
+		if(move){
+			windowXStart=totalWindowXStart;
+			windowYStart=totalWindowYStart;
+			move=false;
+		}
+
+		//Hemos abierto los ojos hace menos de eye frames
+		if(eye!=0){
+			//std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
+			windowXSize=totalWindowXSize-eye/100.0;
+			windowYSize=totalWindowYSize-eye/100.0;
+			if(eye>0){			
+				eye=eye-1;
+			}else{
+				eye=eye+1;
+			}
 		}
 
         // Calculate our blocksize per frame to cater for slider
@@ -314,9 +337,19 @@ int main(int argc, char **argv)
         blockYSize = ceil(height * windowYSize / divisionsY);
 		if(blockXSize<1){ blockXSize=1; }
 		if(blockYSize<1){ blockYSize=1;	}
-//std::cout << "blockXSize " << blockXSize << " xLoop " << (width * windowXStart) - (width * windowXSize  / 2) << " " << (width * windowXStart) + (width * windowXSize  / 2) << std::endl;
 
-//std::cout << "blockYSize " << blockYSize << " yLoop " << (height * windowYStart) - (height * windowYSize  / 2) << " " << (height * windowYStart) + (height * windowYSize  / 2) << std::endl;
+		if((width * windowXStart) - (width * windowXSize  / 2)<0){
+			windowXStart = 0 + windowXSize  / 2; 
+		}
+		if((width * windowXStart) + (width * windowXSize  / 2)>width){
+			windowXStart = 1 - windowXSize  / 2; 
+		}
+		if((height * windowYStart) - (height * windowYSize  / 2)<0){
+			windowYStart = 0 + windowYSize  / 2; 
+		}
+		if((height * windowYStart) + (height * windowYSize  / 2)>height){
+			windowYStart = 1 - windowYSize  / 2; 
+		}
 
         pixelCount = blockXSize * blockYSize; // How many pixels we'll read per block - used to find the average colour
 
@@ -334,9 +367,6 @@ int main(int argc, char **argv)
                 uchar greenSum[blockXSize*blockYSize];
                 uchar blueSum[blockXSize*blockYSize];
                 int imageSum[blockXSize*blockYSize];
-
-//				for (int i = 0; i < blockXSize*blockYSize; ++i) 
-//				 		imageSum[i]=12;
 
                 // Read every pixel in the block and calculate the average colour
                 for (int pixXLoop = 0; pixXLoop < blockXSize; pixXLoop++)
@@ -358,11 +388,6 @@ int main(int argc, char **argv)
  
                 } // End of outer x pixel countier loop
 
-//				if(yLoop==96 && xLoop==128){
-//					for (int i = 0; i < blockXSize*blockYSize; ++i) 
-//				 		std::cout << i << " _ " << imageSum[i] << " -> ";
-//				}
-
                 std::sort(imageSum, imageSum + blockXSize * blockYSize);
 				std::sort(redSum, redSum + blockXSize * blockYSize);
 				std::sort(greenSum, greenSum + blockXSize * blockYSize);
@@ -370,7 +395,7 @@ int main(int argc, char **argv)
 
 //				if(yLoop==96 && xLoop==128){
 //					for (int i = 0; i < blockXSize*blockYSize; ++i) 
-//				 		std::cout << i << " / " << imageSum[i] << " -> ";
+//				 		std::cout << i << " / " << imageSum[i] << " -> " << std::endl;
 //				}
 
 				int div=9;
@@ -380,15 +405,10 @@ int main(int argc, char **argv)
                 blue  = blueSum[blockXSize*blockYSize/div];
                 blackWhite = imageSum[blockXSize*blockYSize/div];
 
-//				std::cout << "yLoop " << yLoop << " xLoop " << xLoop << " blackWhite " << blackWhite << " ini " << imageSum[0] << " fin " << imageSum[blockXSize*blockYSize-1] << std::endl;
-
 				if(blackWhite>255 && div>0){ // && blackWhite<=0
 					div=div-1;
 	                blackWhite = imageSum[blockXSize*blockYSize/div];
 				}
-				
-
-				//std::cout << "blackWhite " << blackWhite << " ini " << imageSum[0] << " fin " << imageSum[blockXSize*blockYSize-1] << std::endl;
 
                 //Si queremos probar como se vería todo en un solo color
                 if(useBlackWhite){
@@ -396,8 +416,6 @@ int main(int argc, char **argv)
                     green = 0;
                     blue  = 0;
                 }
-
-//std::cout << "ii " << ii << " ij " << ij << "blockYSize " << blockYSize << " blockXSize " << blockXSize << std::endl;
 
 				unsigned char redcolor = c;
 				unsigned char greencolor = c;
@@ -438,10 +456,6 @@ int main(int argc, char **argv)
  			ij++;
         } // End of outer x loop
 
-//		for (int i = 0; i < 198; ++i) 
-//				 		std::cout << i << " _ " << (int) iimg0[i] << " -> ";
-//		for (int i = 0; i < 198; ++i) 
-//				 		std::cout << i << " / " << (int) iimg1[i] << " -> ";
 		write (fd0, iimg1, 198);
 		write (fd1, iimg0, 198);
  
