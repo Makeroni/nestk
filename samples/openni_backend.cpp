@@ -21,8 +21,6 @@
 
 #include <typeinfo>
 
-using namespace cv;
-using namespace ntk;
 namespace opt
 {
 	ntk::arg<bool> high_resolution("--highres", "High resolution color image.", 0);
@@ -39,15 +37,15 @@ int divisionsY = 8;     // Initial number of divisions en el eje Y
 
 //TAMAÑO VENTANA (%)
 float totalWindowXStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje X
-float totalWindowXSize = 40.0/100.0; // % de la imagen que se emuestra en la salida de los leds en X
+float totalWindowXSize = 39.9/100.0; // % de la imagen que se emuestra en la salida de los leds en X
 float totalWindowYStart = 40.0/100.0; // % de la imagen en el que se situa el centro eje Y
-float totalWindowYSize = 40.0/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
+float totalWindowYSize = 39.9/100.0; // % de la imagen que se emuestra en la salida de los leds en Y
 
 int blockXSize;         // Horizontal block size
 int blockYSize;         // Vertical block size
 
-int width;              // The width  of the input stream
-int height;             // The height of the input stream
+int width;              // The width  of the input stream 640
+int height;             // The height of the input stream 480
 
 //Si es mayor que 0, indica que hemos parpadeado
 int eye = 0;
@@ -158,8 +156,8 @@ int main(int argc, char **argv)
 	unsigned char c = (unsigned char) (254);
 
     // Parse command line options.
-    arg_base::set_help_option("-h");
-    arg_parse(argc, argv);
+    ntk::arg_base::set_help_option("-h");
+    ntk::arg_parse(argc, argv);
 
 //    // Set debug level to 1.
 //    ntk::ntk_debug_level = 100;
@@ -169,9 +167,9 @@ int main(int argc, char **argv)
     QApplication app (argc, argv);
     QDir::setCurrent(QApplication::applicationDirPath());
     // Declare the global OpenNI driver. Only one can be instantiated in a program.
-    OpenniDriver ni_driver;
+    ntk::OpenniDriver ni_driver;
     // Declare the frame grabber.
-    OpenniGrabber grabber(ni_driver, opt::kinect_id());
+    ntk::OpenniGrabber grabber(ni_driver, opt::kinect_id());
     // High resolution 1280x1024 RGB Image.
     if (opt::high_resolution())
         grabber.setHighRgbResolution(true);
@@ -179,12 +177,9 @@ int main(int argc, char **argv)
     grabber.connectToDevice();
     grabber.start();
     // Holder for the current image.
-    RGBDImage image;
+    ntk::RGBDImage image;
     // Image post processor. Compute mappings when RGB resolution is 1280x1024.
-    OpenniRGBDProcessor post_processor;
-
-    //namedWindow("users");
-    RGBDFrameRecorder record("base");
+    ntk::OpenniRGBDProcessor post_processor;
 
     cv::Mat3b depth_as_color;
 
@@ -196,7 +191,7 @@ int main(int argc, char **argv)
     // Create two windows
     cvNamedWindow("WebCam", CV_WINDOW_AUTOSIZE);
     cvNamedWindow("Low Rez Stream", CV_WINDOW_AUTOSIZE);
-
+	// Establecemos que hacer con las señales del ratón al estar sobre la ventana
 	cvSetMouseCallback("WebCam", CallBackFunc, NULL);
 
     // Get an initial frame so we know the size of things (cvQueryFrame is a combination of cvGrabFrame and cvRetrieveFrame)
@@ -207,9 +202,8 @@ int main(int argc, char **argv)
 	post_processor.processImage(image);
 
     int** blackWhite_im;     // Imagen en blanco y negro
-	blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
+	blackWhite_im = ntk::compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
 	pFrame = new IplImage(depth_as_color);
-
  
     // Create an image the same size and colour-depth as our input stream
    	IplImage* pLowRezFrame = cvCreateImage(cvSize(pFrame->width, pFrame->height), IPL_DEPTH_8U, 3);
@@ -282,13 +276,21 @@ int main(int argc, char **argv)
 	float windowYSize = totalWindowYSize;
 	float windowXStart = totalWindowXStart;
 	float windowYStart = totalWindowYStart;
+
+	unsigned char redcolor;
+	unsigned char greencolor;
+	unsigned char bluecolor;
+
+	int div;
+
     while (quit == false)
-    {		
+    {
         // Grab a frame from the webcam 
         grabber.waitForNextFrame();
 		grabber.copyImageTo(image);
 		post_processor.processImage(image);
-		blackWhite_im = compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
+
+		blackWhite_im = ntk::compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
 		pFrame = new IplImage(depth_as_color);
 
         // Draw the original frame and low resolution version
@@ -307,7 +309,7 @@ int main(int argc, char **argv)
                 0
             );			
 		}
-
+//		std::cout << "zona " << 2 << std::endl;
 		//Si hemos detectado movimiento actualizamos la posición del centro del cuadro
 		if(move){
 			windowXStart=totalWindowXStart;
@@ -317,7 +319,7 @@ int main(int argc, char **argv)
 
 		//Hemos abierto los ojos hace menos de eye frames
 		if(eye!=0){
-			//std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
+//			std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
 			windowXSize=totalWindowXSize-eye/100.0;
 			windowYSize=totalWindowYSize-eye/100.0;
 			if(eye>0){			
@@ -325,6 +327,9 @@ int main(int argc, char **argv)
 			}else{
 				eye=eye+1;
 			}
+		}else{
+			windowXSize=totalWindowXSize;
+			windowYSize=totalWindowYSize;
 		}
 
         // Calculate our blocksize per frame to cater for slider
@@ -333,33 +338,37 @@ int main(int argc, char **argv)
 		if(blockXSize<1){ blockXSize=1; }
 		if(blockYSize<1){ blockYSize=1;	}
 
-		if((width * windowXStart) - (width * windowXSize  / 2)<0){
-			windowXStart = 0 + windowXSize  / 2; 
+//		td::cout << "zona " << 3 << "windowYStart " << windowYStart << "windowXStart " << windowXStart << "windowXSize " << windowXSize << "windowYSize " << windowYSize << std::endl;
+		if((width * windowXStart) - (width * windowXSize  / 2.0)<0){
+			windowXStart = 0.0 + windowXSize  / 2.0; 
 		}
-		if((width * windowXStart) + (width * windowXSize  / 2)>width){
-			windowXStart = 1 - windowXSize  / 2; 
+		if((width * windowXStart) + (width * windowXSize  / 2.0)>width){
+			windowXStart = 1.0 - windowXSize  / 2.0; 
 		}
-		if((height * windowYStart) - (height * windowYSize  / 2)<0){
-			windowYStart = 0 + windowYSize  / 2; 
+		if((height * windowYStart) - (height * windowYSize  / 2.0)<0){
+			windowYStart = 0.0 + windowYSize  / 2.0; 
 		}
-		if((height * windowYStart) + (height * windowYSize  / 2)>height){
-			windowYStart = 1 - windowYSize  / 2; 
+		if((height * windowYStart) + (height * windowYSize  / 2.0)>height){
+			windowYStart = 1.0 - windowYSize  / 2.0; 
 		}
+//		std::cout << "zona " << 3 << "windowYStart " << windowYStart << "windowXStart " << windowXStart << "windowXSize " << windowXSize << "windowYSize " << windowYSize << std::endl;
+
+        // Reset our colour counters for each block
+        uchar redSum[blockXSize*blockYSize];
+        uchar greenSum[blockXSize*blockYSize];
+        uchar blueSum[blockXSize*blockYSize];
+        int imageSum[blockXSize*blockYSize];		
 
 		ij = 0;
         // Loop through each block vertically
-        for (int yLoop = (height * windowYStart) - (height * windowYSize  / 2); yLoop < (height * windowYStart) + (height * windowYSize  / 2); yLoop += blockYSize)
+        for (int yLoop = (height * windowYStart) - (height * windowYSize  / 2.0); yLoop < (height * windowYStart) + (height * windowYSize  / 2.0); yLoop += blockYSize)
         {
 			ii = 0;
 	        // Loop through each block horizontally
-	        for (int xLoop = (width * windowXStart) - (width * windowXSize  / 2); xLoop < (width * windowXStart) + (width * windowXSize  / 2); xLoop += blockXSize)
+	        for (int xLoop = (width * windowXStart) - (width * windowXSize  / 2.0); xLoop < (width * windowXStart) + (width * windowXSize  / 2.0); xLoop += blockXSize)
 	        {
- 
-                // Reset our colour counters for each block
-                uchar redSum[blockXSize*blockYSize];
-                uchar greenSum[blockXSize*blockYSize];
-                uchar blueSum[blockXSize*blockYSize];
-                int imageSum[blockXSize*blockYSize];
+//				std::cout << "zona " << 31 << std::endl; 
+//				std::cout << "yLoop " << yLoop << " blockYSize " << blockYSize << " xLoop " << xLoop << " blockXSize " << blockXSize << std::endl;
 
                 // Read every pixel in the block and calculate the average colour
                 for (int pixXLoop = 0; pixXLoop < blockXSize; pixXLoop++)
@@ -367,20 +376,28 @@ int main(int argc, char **argv)
  
                     for (int pixYLoop = 0; pixYLoop < blockYSize; pixYLoop++)
                     {
-                        imageSum[pixXLoop*blockYSize+pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
- 
-                        // Get the pixel colour from the webcam stream
-                        ptr = cvPtr2D(pFrame, yLoop + pixYLoop, xLoop + pixXLoop, NULL);
- 
-                        // Add each component to its sum
-                        redSum[pixXLoop*blockYSize+pixYLoop] = ptr[2];
-                        greenSum[pixXLoop*blockYSize+pixYLoop] = ptr[1];
-                        blueSum[pixXLoop*blockYSize+pixYLoop] = ptr[0];
+						if((yLoop + pixYLoop < height) && (xLoop + pixXLoop < width)){
+		                    imageSum[pixXLoop*blockYSize+pixYLoop]=blackWhite_im[yLoop + pixYLoop][xLoop + pixXLoop];
+		                    // Get the pixel colour from the webcam stream
+		                    ptr = cvPtr2D(pFrame, yLoop + pixYLoop, xLoop + pixXLoop, NULL);	 
+						}else{
+//							std::cout << "zona " << 32 << std::endl;
+							imageSum[pixXLoop*blockYSize+pixYLoop]=255;
+							ptr[0]=255;
+							ptr[1]=255;
+							ptr[2]=255;
+//							quit=true;
+//							return 0;
+						}
+	                    // Add each component to its sum
+	                    redSum[pixXLoop*blockYSize+pixYLoop] = ptr[2];
+	                    greenSum[pixXLoop*blockYSize+pixYLoop] = ptr[1];
+	                    blueSum[pixXLoop*blockYSize+pixYLoop] = ptr[0];
  
                     } // End of inner y pixel counting loop
  
                 } // End of outer x pixel countier loop
-
+//				std::cout << "zona " << 4 << std::endl;
                 std::sort(imageSum, imageSum + blockXSize * blockYSize);
 				std::sort(redSum, redSum + blockXSize * blockYSize);
 				std::sort(greenSum, greenSum + blockXSize * blockYSize);
@@ -391,7 +408,7 @@ int main(int argc, char **argv)
 //				 		std::cout << i << " / " << imageSum[i] << " -> " << std::endl;
 //				}
 
-				int div=9;
+				div=9;
                 // Calculate the average colour of the block
                 red   = redSum[blockXSize*blockYSize/div];
                 green = greenSum[blockXSize*blockYSize/div];
@@ -409,10 +426,10 @@ int main(int argc, char **argv)
                     green = 0;
                     blue  = 0;
                 }
-
-				unsigned char redcolor = c;
-				unsigned char greencolor = c;
-				unsigned char bluecolor = c;
+//				std::cout << "zona " << 5 << std::endl;
+				redcolor = c;
+				greencolor = c;
+				bluecolor = c;
 				if(!colorTest)
 				{
 					redcolor=(unsigned char)(red*red*red/255/255);
@@ -433,7 +450,7 @@ int main(int argc, char **argv)
 					iimg1[3+(7-ij+8*(7-(ii-8)))*3+1] = greencolor;
 					iimg1[3+(7-ij+8*(7-(ii-8)))*3+2] = bluecolor;
 				}
-
+//				std::cout << "zona " << 6 << std::endl;
                 // Draw a rectangle of the average colour
                 cvRectangle(
                     pLowRezFrame,
@@ -444,17 +461,18 @@ int main(int argc, char **argv)
                     8,
                     0
                 );
+//				std::cout << "zona " << 61 << std::endl;
  				ii++;
             } // End of inner y loop
  			ij++;
         } // End of outer x loop
-
+//		std::cout << "zona " << 62 << std::endl;
 	 	returnValue = write (fd0, iimg1, 198);
  		returnValue = write (fd1, iimg0, 198);
- 
+// 		std::cout << "zona " << 7  << " returnValue " << returnValue << std::endl;
         // Wait 5 millisecond
         keypress = cvWaitKey(1);
- 
+
         // Set the flag to quit if the key pressed was escape
         if (keypress == 27)
         {
