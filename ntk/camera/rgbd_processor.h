@@ -261,9 +261,9 @@ public:
 void compute_color_encoded_depth(const cv::Mat1f& depth, cv::Mat3b& color_dept,
                                  double* min_val = 0, double* max_val = 0);
 
-int** compute_color_encoded_depth2(const cv::Mat1f& depth, cv::Mat3b& color_dept,
+void compute_color_encoded_depth2(const cv::Mat1f& depth, cv::Mat3b& color_dept,
                                  double* min_val = 0, double* max_val = 0
-                                 , double* i_med_val = 0);
+                                 , double* i_med_val = 0, int*** blackWhite_d = 0);
 
 
 class DepthVisualizer

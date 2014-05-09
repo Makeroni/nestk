@@ -49,6 +49,8 @@ int height;             // The height of the input stream 480
 
 //Si es mayor que 0, indica que hemos parpadeado
 int eye = 0;
+//Si es mayor que 0, indica que tenemos los ojos cerrados
+bool close_eye = false;
 //Si es mayor que 0, indica que hemos movido los ojos
 bool move = false;
 
@@ -136,13 +138,18 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 {
 	if  ( event == EVENT_LBUTTONDOWN )
 	{
-		eye = -30;
+		close_eye = true;
 	}
+	else if ( event == EVENT_LBUTTONUP )
+     {
+		close_eye = false;
+		eye = -30;
+     }
 	else if ( event == EVENT_MOUSEMOVE )
      {
-			totalWindowXStart = (float)x / (float)width;
-			totalWindowYStart = (float)y / (float)height;
-			move=true;
+		totalWindowXStart = (float)x / (float)width;
+		totalWindowYStart = (float)y / (float)height;
+		move=true;
      }
 }
 
@@ -196,30 +203,33 @@ int main(int argc, char **argv)
 
     // Get an initial frame so we know the size of things (cvQueryFrame is a combination of cvGrabFrame and cvRetrieveFrame)
     IplImage* pFrame = NULL;
+	IplImage pFrameAux;
 
 	grabber.waitForNextFrame();
 	grabber.copyImageTo(image);
 	post_processor.processImage(image);
 
     int** blackWhite_im;     // Imagen en blanco y negro
-	blackWhite_im = ntk::compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
-	pFrame = new IplImage(depth_as_color);
- 
+	blackWhite_im = new int*[image.depth().rows];
+	for (int r = 0; r < image.depth().rows; ++r)
+    {
+		blackWhite_im[r] = new int[image.depth().cols];
+	}
+	ntk::compute_color_encoded_depth2(image.depth(), depth_as_color,
+			 &zmin, &zmax, &zmed, &blackWhite_im);
+	pFrameAux = depth_as_color;
+	pFrame = &pFrameAux;
+
     // Create an image the same size and colour-depth as our input stream
    	IplImage* pLowRezFrame = cvCreateImage(cvSize(pFrame->width, pFrame->height), IPL_DEPTH_8U, 3);
  
-    uchar *ptr; // Pointer to our pixel
+    uchar *ptr = NULL; // Pointer to our pixel
  
     int red, green, blue, blackWhite; // Integers to hold our pixel values
  
     // Get the width and height of our webcam input stream
     width  = pFrame->width ;
     height = pFrame->height;
- 
-    // Integers to hold our total colour values (used to find the average)
-    int redSum     = 0;
-    int greenSum   = 0;
-    int blueSum    = 0;
  
     // Loop controling vars
     char keypress;
@@ -290,8 +300,10 @@ int main(int argc, char **argv)
 		grabber.copyImageTo(image);
 		post_processor.processImage(image);
 
-		blackWhite_im = ntk::compute_color_encoded_depth2(image.depth(), depth_as_color, &zmin, &zmax, &zmed);
-		pFrame = new IplImage(depth_as_color);
+		ntk::compute_color_encoded_depth2(image.depth(), depth_as_color,
+			 &zmin, &zmax, &zmed, &blackWhite_im);
+		pFrameAux = depth_as_color;
+		pFrame = &pFrameAux;
 
         // Draw the original frame and low resolution version
         cvShowImage("WebCam", pFrame);
@@ -309,7 +321,6 @@ int main(int argc, char **argv)
                 0
             );			
 		}
-//		std::cout << "zona " << 2 << std::endl;
 		//Si hemos detectado movimiento actualizamos la posición del centro del cuadro
 		if(move){
 			windowXStart=totalWindowXStart;
@@ -319,7 +330,6 @@ int main(int argc, char **argv)
 
 		//Hemos abierto los ojos hace menos de eye frames
 		if(eye!=0){
-//			std::cout << "totalWindowXSize " << totalWindowXSize << "totalWindowXSize/eye" << totalWindowXSize-(float)eye/100.0 << "eye" << eye << std::endl;
 			windowXSize=totalWindowXSize-eye/100.0;
 			windowYSize=totalWindowYSize-eye/100.0;
 			if(eye>0){			
@@ -338,7 +348,6 @@ int main(int argc, char **argv)
 		if(blockXSize<1){ blockXSize=1; }
 		if(blockYSize<1){ blockYSize=1;	}
 
-//		td::cout << "zona " << 3 << "windowYStart " << windowYStart << "windowXStart " << windowXStart << "windowXSize " << windowXSize << "windowYSize " << windowYSize << std::endl;
 		if((width * windowXStart) - (width * windowXSize  / 2.0)<0){
 			windowXStart = 0.0 + windowXSize  / 2.0; 
 		}
@@ -351,7 +360,6 @@ int main(int argc, char **argv)
 		if((height * windowYStart) + (height * windowYSize  / 2.0)>height){
 			windowYStart = 1.0 - windowYSize  / 2.0; 
 		}
-//		std::cout << "zona " << 3 << "windowYStart " << windowYStart << "windowXStart " << windowXStart << "windowXSize " << windowXSize << "windowYSize " << windowYSize << std::endl;
 
         // Reset our colour counters for each block
         uchar redSum[blockXSize*blockYSize];
@@ -367,9 +375,6 @@ int main(int argc, char **argv)
 	        // Loop through each block horizontally
 	        for (int xLoop = (width * windowXStart) - (width * windowXSize  / 2.0); xLoop < (width * windowXStart) + (width * windowXSize  / 2.0); xLoop += blockXSize)
 	        {
-//				std::cout << "zona " << 31 << std::endl; 
-//				std::cout << "yLoop " << yLoop << " blockYSize " << blockYSize << " xLoop " << xLoop << " blockXSize " << blockXSize << std::endl;
-
                 // Read every pixel in the block and calculate the average colour
                 for (int pixXLoop = 0; pixXLoop < blockXSize; pixXLoop++)
                 {
@@ -381,13 +386,10 @@ int main(int argc, char **argv)
 		                    // Get the pixel colour from the webcam stream
 		                    ptr = cvPtr2D(pFrame, yLoop + pixYLoop, xLoop + pixXLoop, NULL);	 
 						}else{
-//							std::cout << "zona " << 32 << std::endl;
 							imageSum[pixXLoop*blockYSize+pixYLoop]=255;
 							ptr[0]=255;
 							ptr[1]=255;
 							ptr[2]=255;
-//							quit=true;
-//							return 0;
 						}
 	                    // Add each component to its sum
 	                    redSum[pixXLoop*blockYSize+pixYLoop] = ptr[2];
@@ -397,24 +399,25 @@ int main(int argc, char **argv)
                     } // End of inner y pixel counting loop
  
                 } // End of outer x pixel countier loop
-//				std::cout << "zona " << 4 << std::endl;
                 std::sort(imageSum, imageSum + blockXSize * blockYSize);
 				std::sort(redSum, redSum + blockXSize * blockYSize);
 				std::sort(greenSum, greenSum + blockXSize * blockYSize);
 				std::sort(blueSum, blueSum + blockXSize * blockYSize);
 
-//				if(yLoop==96 && xLoop==128){
-//					for (int i = 0; i < blockXSize*blockYSize; ++i) 
-//				 		std::cout << i << " / " << imageSum[i] << " -> " << std::endl;
-//				}
-
 				div=9;
                 // Calculate the average colour of the block
-                red   = redSum[blockXSize*blockYSize/div];
-                green = greenSum[blockXSize*blockYSize/div];
-                blue  = blueSum[blockXSize*blockYSize/div];
-                blackWhite = imageSum[blockXSize*blockYSize/div];
 
+				if(!close_eye){
+		            red   = redSum[blockXSize*blockYSize/div];
+		            green = greenSum[blockXSize*blockYSize/div];
+		            blue  = blueSum[blockXSize*blockYSize/div];
+		            blackWhite = imageSum[blockXSize*blockYSize/div];
+				}else{
+		            red   = 0;
+		            green = 0;
+		            blue  = 0;
+		            blackWhite = 0;
+				}
 				if(blackWhite>255 && div>0){ // && blackWhite<=0
 					div=div-1;
 	                blackWhite = imageSum[blockXSize*blockYSize/div];
@@ -426,7 +429,6 @@ int main(int argc, char **argv)
                     green = 0;
                     blue  = 0;
                 }
-//				std::cout << "zona " << 5 << std::endl;
 				redcolor = c;
 				greencolor = c;
 				bluecolor = c;
@@ -450,7 +452,6 @@ int main(int argc, char **argv)
 					iimg1[3+(7-ij+8*(7-(ii-8)))*3+1] = greencolor;
 					iimg1[3+(7-ij+8*(7-(ii-8)))*3+2] = bluecolor;
 				}
-//				std::cout << "zona " << 6 << std::endl;
                 // Draw a rectangle of the average colour
                 cvRectangle(
                     pLowRezFrame,
@@ -461,15 +462,12 @@ int main(int argc, char **argv)
                     8,
                     0
                 );
-//				std::cout << "zona " << 61 << std::endl;
  				ii++;
             } // End of inner y loop
  			ij++;
         } // End of outer x loop
-//		std::cout << "zona " << 62 << std::endl;
 	 	returnValue = write (fd0, iimg1, 198);
  		returnValue = write (fd1, iimg0, 198);
-// 		std::cout << "zona " << 7  << " returnValue " << returnValue << std::endl;
         // Wait 5 millisecond
         keypress = cvWaitKey(1);
 
@@ -478,9 +476,8 @@ int main(int argc, char **argv)
         {
             quit = true;
         }
- 
     } // End of while loop
- 
+
  	grabber.stop();
 
     // Release our images & destroy all windows
